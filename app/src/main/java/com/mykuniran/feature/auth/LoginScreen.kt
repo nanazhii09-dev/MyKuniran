@@ -68,7 +68,7 @@ fun LoginScreen(
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { err ->
-            snackbarHostState.showSnackbar(context.getString(err.messageRes))
+            snackbarHostState.showSnackbar(context.getString(err.messageRes) + " [" + err + "]")
             viewModel.clearError()
         }
     }
@@ -171,9 +171,11 @@ fun LoginScreen(
                                 val email = cred.id
                                 val idToken = cred.idToken
                                 viewModel.signInWithGoogle(name, email, idToken)
-                            }.onFailure {
-                                // Fallback to manual form data
-                                viewModel.signInWithGoogle(fullNameInput, emailInput)
+                            }.onFailure { e ->
+                                android.util.Log.e("MyKuniranAuth", "Google sign-in gagal", e)
+                                snackbarHostState.showSnackbar(
+                                    "${e::class.simpleName}: ${e.message}"
+                                )
                             }
                         }
                     },

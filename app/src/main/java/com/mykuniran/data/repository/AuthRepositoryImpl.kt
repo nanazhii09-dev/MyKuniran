@@ -39,25 +39,21 @@ class AuthRepositoryImpl(
         name: String
     ): Resource<UserProfile> = withContext(Dispatchers.IO) {
         try {
-            var userId = sessionManager.getUserId() ?: UUID.randomUUID().toString()
-            var token = if (idToken.isNotBlank()) idToken else "session_token_$userId"
+            require(idToken.isNotBlank()) { "AUTH_NO_ID_TOKEN" }
 
-            // Authenticate with Supabase Auth if Google ID token is present
-            if (idToken.isNotBlank()) {
-                val authBody = mapOf(
-                    "provider" to "google",
-                    "id_token" to idToken,
-                    "client_id" to SupabaseConfig.googleAndroidClientId
-                )
-                val authResult = runCatching { apiService.signInWithIdToken(authBody) }.getOrNull()
-                if (authResult != null && authResult.isSuccessful) {
-                    val authData = authResult.body()
-                    if (authData != null) {
-                        token = authData.accessToken
-                        authData.user?.id?.let { userId = it }
-                    }
-                }
+            val authResult = apiService.signInWithIdToken(
+                mapOf("provider" to "google", "id_token" to idToken)
+            )
+            if (!authResult.isSuccessful) {
+                val errBody = authResult.errorBody()?.string().orEmpty()
+                android.util.Log.e("MyKuniranAuth", "Supabase id_token gagal HTTP ${authResult.code()}: $errBody")
+                throw Exception("AUTH_FAILED HTTP ${authResult.code()}: $errBody")
             }
+            val authData = authResult.body()
+                ?: throw Exception("AUTH_FAILED respon kosong")
+            val token = authData.accessToken
+            val userId = authData.user?.id
+                ?: throw Exception("AUTH_FAILED tanpa user id")
 
             // Save session credentials
             sessionManager.saveSession(
